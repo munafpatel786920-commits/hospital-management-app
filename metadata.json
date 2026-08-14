@@ -1,0 +1,8 @@
+{
+  "name": "Remix CareMatrix Hospital Management System",
+  "description": "A complete, multi-tenant and multi-country Hospital Management System (HMS) supporting active patient charts, bed allocations, digital prescriptions, laboratory diagnostics, and multi-currency billing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "entities": {
+    "Hospital": {
+      "collection": "hospitals",
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "countryCode": { "type": "string" },
+        "currency": { "type": "string" },
+        "language": { "type": "string" },
+        "status": { "type": "string" },
+        "plan": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "taxSystem": { "type": "string" },
+        "taxRate": { "type": "number" },
+        "departments": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      }
+    },
+    "User": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string" },
+        "hospitalId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "specialization": { "type": "string" },
+        "department": { "type": "string" }
+      }
+    },
+    "Patient": {
+      "collection": "patients",
+      "fields": {
+        "id": { "type": "string" },
+        "hospitalId": { "type": "string" },
+        "name": { "type": "string" },
+        "age": { "type": "number" },
+        "gender": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Appointment": {
+      "collection": "appointments",
+      "fields": {
+        "id": { "type": "string" },
+        "hospitalId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "doctorId": { "type": "string" },
+        "department": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "AppState": {
+      "collection": "app_state",
+      "fields": {
+        "updatedAt": { "type": "string" },
+        "data": { "type": "string" }
+      }
+    }
+  }
+}
