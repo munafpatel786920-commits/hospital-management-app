@@ -133,7 +133,8 @@ export default function App() {
 
   // Synchronize tenant parameters
   useEffect(() => {
-    const selected = DB.getHospitals().find(h => h.id === selectedHospitalId);
+    const allHospitals = DB.getHospitals();
+    const selected = allHospitals.find(h => h.id === selectedHospitalId);
     if (selected) {
       setHospitalDetails(selected);
       // Automatically switch default translation language based on hospital choice
@@ -142,8 +143,11 @@ export default function App() {
       } else if (selected.id === "HOSP-002") {
         setCurrentLanguage("en");
       }
+    } else if (allHospitals.length > 0) {
+      setSelectedHospitalId(allHospitals[0].id);
+      setHospitalDetails(allHospitals[0]);
     }
-  }, [selectedHospitalId]);
+  }, [selectedHospitalId, hospitals]);
 
   // Synchronize users lists when DB is modified
   const handleRefreshHospital = () => {

@@ -95,6 +95,21 @@ export default function SupportModules({
   const [expenseCategory, setExpenseCategory] = useState("Utility");
   const [showExpenseForm, setShowExpenseForm] = useState(false);
 
+  // Synchronize support records whenever hospitalId or database changes
+  React.useEffect(() => {
+    const refreshData = () => {
+      setMedicines(DB.getMedicines(hospitalId));
+      setInvoices(DB.getBillingInvoices(hospitalId));
+      setEmployees(DB.getHRRecord(hospitalId));
+      setPatients(DB.getPatients(hospitalId));
+      setPurchases(DB.getMedicinePurchases(hospitalId));
+      setExpenses(DB.getExpenses(hospitalId));
+    };
+    refreshData();
+    const unsub = DB.subscribe(refreshData);
+    return () => unsub();
+  }, [hospitalId]);
+
   const handleAddToCart = (med: Medicine) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === med.id);

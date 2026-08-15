@@ -33,6 +33,15 @@ export default function PatientManagement({
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // Subscribe to DB updates for real-time patient syncing
+  React.useEffect(() => {
+    setPatients(DB.getPatients(hospitalId));
+    const unsub = DB.subscribe(() => {
+      setPatients(DB.getPatients(hospitalId));
+    });
+    return () => unsub();
+  }, [hospitalId]);
+
   // Form State
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"Male" | "Female" | "Other">("Male");

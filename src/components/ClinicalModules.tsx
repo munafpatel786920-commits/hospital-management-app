@@ -62,6 +62,24 @@ export default function ClinicalModules({
   const [opdSearch, setOpdSearch] = useState("");
   const [diagSearch, setDiagSearch] = useState("");
 
+  // Synchronize clinical records whenever hospitalId or database changes
+  React.useEffect(() => {
+    const refreshData = () => {
+      setAppointments(DB.getAppointments(hospitalId));
+      setOpdRecords(DB.getOPD(hospitalId));
+      setIpdRecords(DB.getIPD(hospitalId));
+      setBeds(DB.getBeds(hospitalId));
+      setLabTests(DB.getLabTests(hospitalId));
+      setAmbulances(DB.getAmbulances(hospitalId));
+      setBloodStock(DB.getBloodStock(hospitalId));
+      setDonors(DB.getBloodDonors(hospitalId));
+      setBloodTransactions(DB.getBloodTransactions(hospitalId));
+    };
+    refreshData();
+    const unsub = DB.subscribe(refreshData);
+    return () => unsub();
+  }, [hospitalId]);
+
   // --- 1. APPOINTMENT STATE & HANDLERS ---
   const [aptPatientId, setAptPatientId] = useState("");
   const [aptDoctorId, setAptDoctorId] = useState("");

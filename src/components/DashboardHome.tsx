@@ -52,6 +52,15 @@ export default function DashboardHome({
   const [logSearch, setLogSearch] = useState("");
   const [liveTime, setLiveTime] = useState(new Date());
   const [activeChartTab, setActiveChartTab] = useState<"clinical" | "financial" | "occupancy">("clinical");
+  const [, setDbVersion] = useState(0);
+
+  // Subscribe to DB updates
+  useEffect(() => {
+    const unsub = DB.subscribe(() => {
+      setDbVersion(v => v + 1);
+    });
+    return () => unsub();
+  }, [hospitalId]);
 
   // Clock tick effect
   useEffect(() => {

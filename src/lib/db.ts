@@ -88,7 +88,7 @@ export const getRelativeDateTimeStr = (daysOffset: number, timeStr: string = "12
 };
 
 // Initial Seeding
-const SEED_DATA: SystemDB = {
+export const SEED_DATA: SystemDB = {
   hospitals: [
     {
       id: "HOSP-001",
@@ -957,7 +957,12 @@ class CareMatrixDatabase {
   deleteHospital(hospitalId: string) {
     this.data.hospitals = this.data.hospitals.filter(h => h.id !== hospitalId);
     this.data.users = this.data.users.filter(u => u.hospitalId !== hospitalId);
-    // Cleanup other data
+    if (this.data.doctors) {
+      this.data.doctors = this.data.doctors.filter(d => d.hospitalId !== hospitalId);
+    }
+    if (this.data.staff) {
+      this.data.staff = this.data.staff.filter(s => s.hospitalId !== hospitalId);
+    }
     this.data.patients = this.data.patients.filter(p => p.hospitalId !== hospitalId);
     this.data.appointments = this.data.appointments.filter(a => a.hospitalId !== hospitalId);
     this.data.ipd = this.data.ipd.filter(i => i.hospitalId !== hospitalId);
@@ -971,7 +976,18 @@ class CareMatrixDatabase {
     this.data.inventory = this.data.inventory.filter(i => i.hospitalId !== hospitalId);
     this.data.employees = this.data.employees.filter(e => e.hospitalId !== hospitalId);
     
-    delete this.data.bloodStock[hospitalId];
+    if (this.data.bloodTransactions) {
+      this.data.bloodTransactions = this.data.bloodTransactions.filter(tx => tx.hospitalId !== hospitalId);
+    }
+    if (this.data.medicinePurchases) {
+      this.data.medicinePurchases = this.data.medicinePurchases.filter(p => p.hospitalId !== hospitalId);
+    }
+    if (this.data.expenses) {
+      this.data.expenses = this.data.expenses.filter(e => e.hospitalId !== hospitalId);
+    }
+    if (this.data.bloodStock) {
+      delete this.data.bloodStock[hospitalId];
+    }
     
     this.save();
     this.logAction(null, "system", "Super Admin", UserRole.SUPER_ADMIN, "Delete Hospital", `Deleted hospital ${hospitalId} and all associated data`);
