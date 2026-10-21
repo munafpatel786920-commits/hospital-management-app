@@ -1072,7 +1072,6 @@ class CareMatrixDatabase {
   getRolePermissions(): { [role: string]: string[] } {
     if (!this.data.rolePermissions) {
       this.data.rolePermissions = this.getDefaultRolePermissions();
-      this.save();
     }
     return this.data.rolePermissions;
   }
@@ -1206,7 +1205,6 @@ class CareMatrixDatabase {
         { id: `${hospitalId}-BED-ICU-01`, hospitalId, number: "ICU-101", type: "ICU", status: "Available", ratePerDay: 6000 }
       ];
       this.data.beds.push(...defaultBeds);
-      this.save();
       return defaultBeds;
     }
     return beds;
@@ -1366,7 +1364,6 @@ class CareMatrixDatabase {
         { id: `${hospitalId}-AMB-01`, hospitalId, vehicleNumber: "MH-01-AX-9988", model: "Trauma Care Standard", driverName: "Raju Prasad", driverPhone: "+91 99001-12233", status: "Available", trips: [] }
       ];
       this.data.ambulances.push(...defaultAmb);
-      this.save();
       return defaultAmb;
     }
     return amb;
@@ -1479,7 +1476,6 @@ class CareMatrixDatabase {
     });
 
     this.data.bloodStock[hospitalId] = stock;
-    this.save();
     return stock;
   }
 
