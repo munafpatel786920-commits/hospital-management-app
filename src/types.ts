@@ -57,6 +57,8 @@ export interface Hospital {
   logoUrl?: string;
   taxSystem: string;
   taxRate: number;
+  state?: string;
+  currencySymbol?: string;
   departments: string[];
   createdAt: string;
   updatedAt: string;

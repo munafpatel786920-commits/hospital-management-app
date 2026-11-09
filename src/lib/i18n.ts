@@ -5,18 +5,17 @@
 
 import { CountryConfig } from "../types";
 
-export const COUNTRIES: { [code: string]: CountryConfig } = {
-  US: {
-    code: "US",
-    name: "United States",
-    currency: "USD",
-    currencySymbol: "$",
-    phoneFormat: "+1 (XXX) XXX-XXXX",
-    taxLabel: "Sales Tax",
-    taxRate: 0.08,
-    dateFormat: "MM/DD/YYYY",
-    timeZone: "America/New_York"
-  },
+export interface StateTaxInfo {
+  name: string;
+  taxLabel?: string;
+  taxRate?: number;
+}
+
+export interface ExtendedCountryConfig extends CountryConfig {
+  states?: StateTaxInfo[];
+}
+
+export const COUNTRIES: { [code: string]: ExtendedCountryConfig } = {
   IN: {
     code: "IN",
     name: "India",
@@ -26,18 +25,91 @@ export const COUNTRIES: { [code: string]: CountryConfig } = {
     taxLabel: "GST",
     taxRate: 0.18,
     dateFormat: "DD-MM-YYYY",
-    timeZone: "Asia/Kolkata"
+    timeZone: "Asia/Kolkata",
+    states: [
+      { name: "Maharashtra", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Gujarat", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Delhi (NCT)", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Karnataka", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Tamil Nadu", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Uttar Pradesh", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "West Bengal", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Rajasthan", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Telangana", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Kerala", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Madhya Pradesh", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Punjab", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Haryana", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Bihar", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Andhra Pradesh", taxLabel: "GST (CGST+SGST)", taxRate: 0.18 },
+      { name: "Other States / UTs", taxLabel: "IGST / GST", taxRate: 0.18 }
+    ]
+  },
+  US: {
+    code: "US",
+    name: "United States",
+    currency: "USD",
+    currencySymbol: "$",
+    phoneFormat: "+1 (XXX) XXX-XXXX",
+    taxLabel: "Sales Tax",
+    taxRate: 0.08,
+    dateFormat: "MM/DD/YYYY",
+    timeZone: "America/New_York",
+    states: [
+      { name: "California", taxLabel: "State & Local Sales Tax", taxRate: 0.0725 },
+      { name: "New York", taxLabel: "NY State & City Tax", taxRate: 0.08875 },
+      { name: "Texas", taxLabel: "State Sales Tax", taxRate: 0.0625 },
+      { name: "Florida", taxLabel: "State Sales Tax", taxRate: 0.06 },
+      { name: "Illinois", taxLabel: "Sales Tax", taxRate: 0.0625 },
+      { name: "Pennsylvania", taxLabel: "Sales Tax", taxRate: 0.06 },
+      { name: "Ohio", taxLabel: "Sales Tax", taxRate: 0.0575 },
+      { name: "Georgia", taxLabel: "Sales Tax", taxRate: 0.04 },
+      { name: "North Carolina", taxLabel: "Sales Tax", taxRate: 0.0475 },
+      { name: "Michigan", taxLabel: "Sales Tax", taxRate: 0.06 },
+      { name: "Washington", taxLabel: "Sales Tax", taxRate: 0.065 },
+      { name: "Delaware (No Tax)", taxLabel: "No Sales Tax", taxRate: 0.00 },
+      { name: "Oregon (No Tax)", taxLabel: "No Sales Tax", taxRate: 0.00 },
+      { name: "Montana (No Tax)", taxLabel: "No Sales Tax", taxRate: 0.00 },
+      { name: "New Hampshire (No Tax)", taxLabel: "No Sales Tax", taxRate: 0.00 }
+    ]
   },
   AE: {
     code: "AE",
     name: "United Arab Emirates",
     currency: "AED",
-    currencySymbol: "د.إ",
+    currencySymbol: "AED",
     phoneFormat: "+971 X-XXX-XXXX",
     taxLabel: "VAT",
     taxRate: 0.05,
     dateFormat: "DD/MM/YYYY",
-    timeZone: "Asia/Dubai"
+    timeZone: "Asia/Dubai",
+    states: [
+      { name: "Dubai", taxLabel: "Federal VAT", taxRate: 0.05 },
+      { name: "Abu Dhabi", taxLabel: "Federal VAT", taxRate: 0.05 },
+      { name: "Sharjah", taxLabel: "Federal VAT", taxRate: 0.05 },
+      { name: "Ajman", taxLabel: "Federal VAT", taxRate: 0.05 },
+      { name: "Ras Al Khaimah", taxLabel: "Federal VAT", taxRate: 0.05 },
+      { name: "Fujairah", taxLabel: "Federal VAT", taxRate: 0.05 },
+      { name: "Umm Al Quwain", taxLabel: "Federal VAT", taxRate: 0.05 }
+    ]
+  },
+  SA: {
+    code: "SA",
+    name: "Saudi Arabia (KSA)",
+    currency: "SAR",
+    currencySymbol: "SAR",
+    phoneFormat: "+966 5X XXX XXXX",
+    taxLabel: "VAT",
+    taxRate: 0.15,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Riyadh",
+    states: [
+      { name: "Riyadh Region", taxLabel: "ZATCA VAT", taxRate: 0.15 },
+      { name: "Makkah / Jeddah", taxLabel: "ZATCA VAT", taxRate: 0.15 },
+      { name: "Eastern Province (Dammam)", taxLabel: "ZATCA VAT", taxRate: 0.15 },
+      { name: "Madinah Region", taxLabel: "ZATCA VAT", taxRate: 0.15 },
+      { name: "Asir Region", taxLabel: "ZATCA VAT", taxRate: 0.15 }
+    ]
   },
   GB: {
     code: "GB",
@@ -48,7 +120,68 @@ export const COUNTRIES: { [code: string]: CountryConfig } = {
     taxLabel: "VAT",
     taxRate: 0.20,
     dateFormat: "DD/MM/YYYY",
-    timeZone: "Europe/London"
+    timeZone: "Europe/London",
+    states: [
+      { name: "England", taxLabel: "Standard VAT", taxRate: 0.20 },
+      { name: "Scotland", taxLabel: "Standard VAT", taxRate: 0.20 },
+      { name: "Wales", taxLabel: "Standard VAT", taxRate: 0.20 },
+      { name: "Northern Ireland", taxLabel: "Standard VAT", taxRate: 0.20 }
+    ]
+  },
+  CA: {
+    code: "CA",
+    name: "Canada",
+    currency: "CAD",
+    currencySymbol: "CA$",
+    phoneFormat: "+1 (XXX) XXX-XXXX",
+    taxLabel: "HST/GST",
+    taxRate: 0.13,
+    dateFormat: "YYYY-MM-DD",
+    timeZone: "America/Toronto",
+    states: [
+      { name: "Ontario", taxLabel: "HST", taxRate: 0.13 },
+      { name: "Quebec", taxLabel: "GST + QST", taxRate: 0.14975 },
+      { name: "British Columbia", taxLabel: "GST + PST", taxRate: 0.12 },
+      { name: "Alberta", taxLabel: "GST only", taxRate: 0.05 },
+      { name: "Nova Scotia", taxLabel: "HST", taxRate: 0.15 },
+      { name: "Manitoba", taxLabel: "GST + PST", taxRate: 0.12 }
+    ]
+  },
+  AU: {
+    code: "AU",
+    name: "Australia",
+    currency: "AUD",
+    currencySymbol: "A$",
+    phoneFormat: "+61 X XXXX XXXX",
+    taxLabel: "GST",
+    taxRate: 0.10,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Australia/Sydney",
+    states: [
+      { name: "New South Wales", taxLabel: "Federal GST", taxRate: 0.10 },
+      { name: "Victoria", taxLabel: "Federal GST", taxRate: 0.10 },
+      { name: "Queensland", taxLabel: "Federal GST", taxRate: 0.10 },
+      { name: "Western Australia", taxLabel: "Federal GST", taxRate: 0.10 },
+      { name: "South Australia", taxLabel: "Federal GST", taxRate: 0.10 }
+    ]
+  },
+  DE: {
+    code: "DE",
+    name: "Germany",
+    currency: "EUR",
+    currencySymbol: "€",
+    phoneFormat: "+49 XXX XXXXXXXX",
+    taxLabel: "MwSt",
+    taxRate: 0.19,
+    dateFormat: "DD.MM.YYYY",
+    timeZone: "Europe/Berlin",
+    states: [
+      { name: "Bavaria (Bayern)", taxLabel: "MwSt", taxRate: 0.19 },
+      { name: "North Rhine-Westphalia", taxLabel: "MwSt", taxRate: 0.19 },
+      { name: "Baden-Württemberg", taxLabel: "MwSt", taxRate: 0.19 },
+      { name: "Berlin", taxLabel: "MwSt", taxRate: 0.19 },
+      { name: "Hesse (Hessen)", taxLabel: "MwSt", taxRate: 0.19 }
+    ]
   },
   FR: {
     code: "FR",
@@ -59,7 +192,14 @@ export const COUNTRIES: { [code: string]: CountryConfig } = {
     taxLabel: "TVA",
     taxRate: 0.20,
     dateFormat: "DD/MM/YYYY",
-    timeZone: "Europe/Paris"
+    timeZone: "Europe/Paris",
+    states: [
+      { name: "Île-de-France (Paris)", taxLabel: "TVA", taxRate: 0.20 },
+      { name: "Auvergne-Rhône-Alpes", taxLabel: "TVA", taxRate: 0.20 },
+      { name: "Provence-Alpes-Côte d'Azur", taxLabel: "TVA", taxRate: 0.20 },
+      { name: "Nouvelle-Aquitaine", taxLabel: "TVA", taxRate: 0.20 },
+      { name: "Occitanie", taxLabel: "TVA", taxRate: 0.20 }
+    ]
   },
   ES: {
     code: "ES",
@@ -70,7 +210,188 @@ export const COUNTRIES: { [code: string]: CountryConfig } = {
     taxLabel: "IVA",
     taxRate: 0.21,
     dateFormat: "DD/MM/YYYY",
-    timeZone: "Europe/Madrid"
+    timeZone: "Europe/Madrid",
+    states: [
+      { name: "Community of Madrid", taxLabel: "IVA", taxRate: 0.21 },
+      { name: "Catalonia (Barcelona)", taxLabel: "IVA", taxRate: 0.21 },
+      { name: "Andalusia", taxLabel: "IVA", taxRate: 0.21 },
+      { name: "Valencian Community", taxLabel: "IVA", taxRate: 0.21 },
+      { name: "Canary Islands", taxLabel: "IGIC", taxRate: 0.07 }
+    ]
+  },
+  SG: {
+    code: "SG",
+    name: "Singapore",
+    currency: "SGD",
+    currencySymbol: "S$",
+    phoneFormat: "+65 XXXX XXXX",
+    taxLabel: "GST",
+    taxRate: 0.09,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Singapore",
+    states: [
+      { name: "Central Singapore", taxLabel: "IRAS GST", taxRate: 0.09 },
+      { name: "Jurong / West", taxLabel: "IRAS GST", taxRate: 0.09 },
+      { name: "Tampines / East", taxLabel: "IRAS GST", taxRate: 0.09 }
+    ]
+  },
+  MY: {
+    code: "MY",
+    name: "Malaysia",
+    currency: "MYR",
+    currencySymbol: "RM",
+    phoneFormat: "+60 XX-XXX XXXX",
+    taxLabel: "SST",
+    taxRate: 0.08,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Kuala_Lumpur",
+    states: [
+      { name: "Selangor", taxLabel: "SST", taxRate: 0.08 },
+      { name: "Kuala Lumpur (FT)", taxLabel: "SST", taxRate: 0.08 },
+      { name: "Penang", taxLabel: "SST", taxRate: 0.08 },
+      { name: "Johor", taxLabel: "SST", taxRate: 0.08 },
+      { name: "Sabah", taxLabel: "SST", taxRate: 0.08 },
+      { name: "Sarawak", taxLabel: "SST", taxRate: 0.08 }
+    ]
+  },
+  PK: {
+    code: "PK",
+    name: "Pakistan",
+    currency: "PKR",
+    currencySymbol: "₨",
+    phoneFormat: "+92 XXX XXXXXXX",
+    taxLabel: "GST/Sales Tax",
+    taxRate: 0.18,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Karachi",
+    states: [
+      { name: "Punjab", taxLabel: "PST (Punjab Sales Tax)", taxRate: 0.16 },
+      { name: "Sindh", taxLabel: "SST (Sindh Sales Tax)", taxRate: 0.13 },
+      { name: "Khyber Pakhtunkhwa", taxLabel: "KPRA Sales Tax", taxRate: 0.15 },
+      { name: "Islamabad (ICT)", taxLabel: "Federal Sales Tax", taxRate: 0.18 },
+      { name: "Balochistan", taxLabel: "BRA Sales Tax", taxRate: 0.15 }
+    ]
+  },
+  BD: {
+    code: "BD",
+    name: "Bangladesh",
+    currency: "BDT",
+    currencySymbol: "৳",
+    phoneFormat: "+880 1XXX-XXXXXX",
+    taxLabel: "VAT",
+    taxRate: 0.15,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Dhaka",
+    states: [
+      { name: "Dhaka Division", taxLabel: "NBR VAT", taxRate: 0.15 },
+      { name: "Chittagong Division", taxLabel: "NBR VAT", taxRate: 0.15 },
+      { name: "Sylhet Division", taxLabel: "NBR VAT", taxRate: 0.15 },
+      { name: "Rajshahi Division", taxLabel: "NBR VAT", taxRate: 0.15 },
+      { name: "Khulna Division", taxLabel: "NBR VAT", taxRate: 0.15 }
+    ]
+  },
+  QA: {
+    code: "QA",
+    name: "Qatar",
+    currency: "QAR",
+    currencySymbol: "QR",
+    phoneFormat: "+974 XXXX XXXX",
+    taxLabel: "Tax / Free Zone",
+    taxRate: 0.00,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Qatar",
+    states: [
+      { name: "Doha", taxLabel: "No VAT", taxRate: 0.00 },
+      { name: "Al Rayyan", taxLabel: "No VAT", taxRate: 0.00 },
+      { name: "Al Wakrah", taxLabel: "No VAT", taxRate: 0.00 }
+    ]
+  },
+  KW: {
+    code: "KW",
+    name: "Kuwait",
+    currency: "KWD",
+    currencySymbol: "KD",
+    phoneFormat: "+965 XXXX XXXX",
+    taxLabel: "Tax / Free Zone",
+    taxRate: 0.00,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Kuwait",
+    states: [
+      { name: "Capital (Kuwait City)", taxLabel: "No VAT", taxRate: 0.00 },
+      { name: "Hawalli", taxLabel: "No VAT", taxRate: 0.00 },
+      { name: "Farwaniya", taxLabel: "No VAT", taxRate: 0.00 },
+      { name: "Ahmadi", taxLabel: "No VAT", taxRate: 0.00 }
+    ]
+  },
+  OM: {
+    code: "OM",
+    name: "Oman",
+    currency: "OMR",
+    currencySymbol: "OMR",
+    phoneFormat: "+968 XXXX XXXX",
+    taxLabel: "VAT",
+    taxRate: 0.05,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Asia/Muscat",
+    states: [
+      { name: "Muscat", taxLabel: "Oman VAT", taxRate: 0.05 },
+      { name: "Dhofar (Salalah)", taxLabel: "Oman VAT", taxRate: 0.05 },
+      { name: "Al Batinah", taxLabel: "Oman VAT", taxRate: 0.05 },
+      { name: "Al Dakhiliyah", taxLabel: "Oman VAT", taxRate: 0.05 }
+    ]
+  },
+  ZA: {
+    code: "ZA",
+    name: "South Africa",
+    currency: "ZAR",
+    currencySymbol: "R",
+    phoneFormat: "+27 XX XXX XXXX",
+    taxLabel: "VAT",
+    taxRate: 0.15,
+    dateFormat: "YYYY/MM/DD",
+    timeZone: "Africa/Johannesburg",
+    states: [
+      { name: "Gauteng (Johannesburg)", taxLabel: "SARS VAT", taxRate: 0.15 },
+      { name: "Western Cape (Cape Town)", taxLabel: "SARS VAT", taxRate: 0.15 },
+      { name: "KwaZulu-Natal (Durban)", taxLabel: "SARS VAT", taxRate: 0.15 },
+      { name: "Eastern Cape", taxLabel: "SARS VAT", taxRate: 0.15 }
+    ]
+  },
+  NG: {
+    code: "NG",
+    name: "Nigeria",
+    currency: "NGN",
+    currencySymbol: "₦",
+    phoneFormat: "+234 XXX XXX XXXX",
+    taxLabel: "VAT",
+    taxRate: 0.075,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Africa/Lagos",
+    states: [
+      { name: "Lagos State", taxLabel: "FIRS VAT", taxRate: 0.075 },
+      { name: "Abuja (FCT)", taxLabel: "FIRS VAT", taxRate: 0.075 },
+      { name: "Rivers (Port Harcourt)", taxLabel: "FIRS VAT", taxRate: 0.075 },
+      { name: "Kano State", taxLabel: "FIRS VAT", taxRate: 0.075 },
+      { name: "Oyo (Ibadan)", taxLabel: "FIRS VAT", taxRate: 0.075 }
+    ]
+  },
+  KE: {
+    code: "KE",
+    name: "Kenya",
+    currency: "KES",
+    currencySymbol: "KSh",
+    phoneFormat: "+254 7XX XXXXXX",
+    taxLabel: "VAT",
+    taxRate: 0.16,
+    dateFormat: "DD/MM/YYYY",
+    timeZone: "Africa/Nairobi",
+    states: [
+      { name: "Nairobi County", taxLabel: "KRA VAT", taxRate: 0.16 },
+      { name: "Mombasa County", taxLabel: "KRA VAT", taxRate: 0.16 },
+      { name: "Kisumu County", taxLabel: "KRA VAT", taxRate: 0.16 },
+      { name: "Nakuru County", taxLabel: "KRA VAT", taxRate: 0.16 },
+      { name: "Kiambu County", taxLabel: "KRA VAT", taxRate: 0.16 }
+    ]
   }
 };
 
@@ -745,9 +1066,11 @@ export function translate(key: string, lang: string): string {
   return dictionary[key] || TRANSLATIONS.en[key] || key;
 }
 
-export function formatCurrency(amount: number, countryCode: string): string {
+export function formatCurrency(amount: number, countryCode: string, customSymbol?: string): string {
   const config = COUNTRIES[countryCode] || COUNTRIES.US;
-  return `${config.currencySymbol}${amount.toLocaleString(undefined, {
+  const sym = customSymbol || config.currencySymbol;
+  const space = sym.length > 1 && !sym.endsWith(" ") ? " " : "";
+  return `${sym}${space}${amount.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })}`;

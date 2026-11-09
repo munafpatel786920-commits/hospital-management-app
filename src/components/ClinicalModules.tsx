@@ -187,7 +187,8 @@ export default function ClinicalModules({
     const totalConsultationFee = doctor.consultationFee;
     const items = [{ description: `OPD Consultation: ${doctor.name}`, amount: totalConsultationFee }];
     const subtotal = totalConsultationFee;
-    const taxAmount = Math.round(subtotal * 0.18); // default 18% GST/Tax
+    const activeTaxRate = currentHospital?.taxRate ?? 0.18;
+    const taxAmount = Math.round(subtotal * activeTaxRate);
 
     DB.addBillingInvoice({
       id: `INV-${Math.floor(200000 + Math.random() * 90000)}`,
@@ -388,7 +389,8 @@ export default function ClinicalModules({
     ];
     
     const subtotal = bedTotal + 1500;
-    const taxAmount = Math.round(subtotal * 0.18); // GST
+    const activeTaxRate = currentHospital?.taxRate ?? 0.18;
+    const taxAmount = Math.round(subtotal * activeTaxRate);
     
     DB.addBillingInvoice({
       id: `INV-${Math.floor(300000 + Math.random() * 90000)}`,
@@ -635,17 +637,21 @@ export default function ClinicalModules({
     setLabTests(DB.getLabTests(hospitalId));
 
     // Create a pending bill for this lab test
+    const labSubtotal = Number(labCost) || 0;
+    const activeTaxRate = currentHospital?.taxRate ?? 0.18;
+    const labTaxAmount = Math.round(labSubtotal * activeTaxRate);
+
     DB.addBillingInvoice({
       id: `INV-${Math.floor(400000 + Math.random() * 90000)}`,
       hospitalId,
       patientId: patient.id,
       patientName: patient.name,
       type: "Laboratory",
-      items: [{ description: `Diagnostic Test: ${labTestName}`, amount: Number(labCost) }],
-      subtotal: Number(labCost),
-      taxAmount: Math.round(Number(labCost) * 0.18),
+      items: [{ description: `Diagnostic Test: ${labTestName}`, amount: labSubtotal }],
+      subtotal: labSubtotal,
+      taxAmount: labTaxAmount,
       discount: 0,
-      total: Number(labCost) + Math.round(Number(labCost) * 0.18),
+      total: labSubtotal + labTaxAmount,
       status: "Pending",
       createdAt: new Date().toISOString()
     }, userId, userName, userRole);

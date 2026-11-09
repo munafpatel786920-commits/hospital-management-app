@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { DB } from "../lib/db";
-import { UserRole, AuditLog } from "../types";
+import { UserRole, AuditLog, Hospital } from "../types";
 import { translate, formatDate, formatCurrency } from "../lib/i18n";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -23,6 +23,7 @@ interface DashboardHomeProps {
   userId: string;
   userName: string;
   userRole: UserRole;
+  hospitalDetails?: Hospital;
   onNavigate: (tab: string) => void;
 }
 
@@ -33,6 +34,7 @@ export default function DashboardHome({
   userId,
   userName,
   userRole,
+  hospitalDetails,
   onNavigate
 }: DashboardHomeProps) {
   // Read real-time states from DB
@@ -46,6 +48,10 @@ export default function DashboardHome({
   const ipdRecords = DB.getIPD(hospitalId);
   const allAuditLogs = DB.getAuditLogs(hospitalId);
   const employees = DB.getHRRecord(hospitalId);
+
+  // Dynamic hospital name resolution from settings / DB
+  const activeHospital = hospitalDetails || DB.getHospitals().find(h => h.id === hospitalId);
+  const hospitalName = activeHospital?.name || "CareMatrix Hospital";
 
   // States for search and filter
   const [logFilter, setLogFilter] = useState<"ALL" | "CLINIC" | "BILLING" | "HR">("ALL");
@@ -194,9 +200,11 @@ export default function DashboardHome({
 
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-semibold text-teal-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/25 text-xs font-semibold text-teal-300">
               <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
-              <span>CareMatrix Clinical Hub v4.2</span>
+              <span className="font-bold text-white tracking-wide">{hospitalName}</span>
+              <span className="text-teal-400/80">•</span>
+              <span className="text-teal-200 text-[11px]">Clinical Hub v4.2</span>
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
               {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-blue-300">{userName}</span>

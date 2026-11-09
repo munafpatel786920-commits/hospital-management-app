@@ -28,6 +28,9 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
   // Form State
   const [name, setName] = useState("");
   const [countryCode, setCountryCode] = useState("IN");
+  const [stateName, setStateName] = useState("Maharashtra");
+  const [taxSystem, setTaxSystem] = useState("GST");
+  const [taxRateInput, setTaxRateInput] = useState("18");
   const [plan, setPlan] = useState<"Basic" | "Standard" | "Premium">("Standard");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -79,20 +82,23 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
 
     const hospitalId = `HOSP-${Math.floor(100 + Math.random() * 900)}`;
     const country = COUNTRIES[countryCode] || COUNTRIES.IN;
+    const parsedRate = Math.max(0, Number(taxRateInput) || 0) / 100;
 
     const newHospital: Hospital = {
       id: hospitalId,
       name: name.trim(),
       countryCode,
       currency: country.currency,
+      currencySymbol: country.currencySymbol,
       language: "en",
       status: "Active",
       plan,
       address: address.trim(),
       phone: phone.trim(),
       email: email.trim(),
-      taxSystem: country.taxLabel,
-      taxRate: country.taxRate,
+      state: stateName,
+      taxSystem: taxSystem || country.taxLabel,
+      taxRate: parsedRate,
       departments: ["General Medicine", "Emergency", "ICU", "Pediatrics", "Cardiology", "Pathology", "Pharmacy"],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -312,8 +318,9 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
                         </span>
                       </td>
                       <td className="px-6 py-4 text-xs font-mono text-slate-600 dark:text-slate-400">
-                        <div>Tax: {hospital.taxSystem} ({Math.round(hospital.taxRate * 100)}%)</div>
-                        <div>Currency: {hospital.currency} ({country.currencySymbol})</div>
+                        <div>Tax: {hospital.taxSystem} ({((hospital.taxRate ?? country.taxRate) * 100).toFixed(1).replace(/\.0$/, "")}%)</div>
+                        <div>Currency: {hospital.currency} ({hospital.currencySymbol || country.currencySymbol})</div>
+                        {hospital.state && <div className="text-[10px] text-teal-600 dark:text-teal-400 font-sans font-medium">{hospital.state}</div>}
                       </td>
                       <td className="px-6 py-4">
                         <button
@@ -463,17 +470,105 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
                   <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Country *</label>
                   <select
                     value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
+                    onChange={(e) => {
+                      const newCode = e.target.value;
+                      setCountryCode(newCode);
+                      const c = COUNTRIES[newCode] || COUNTRIES.US;
+                      if (c.states && c.states.length > 0) {
+                        setStateName(c.states[0].name);
+                        setTaxSystem(c.states[0].taxLabel || c.taxLabel);
+                        setTaxRateInput(((c.states[0].taxRate ?? c.taxRate) * 100).toFixed(1).replace(/\.0$/, ""));
+                      } else {
+                        setStateName("");
+                        setTaxSystem(c.taxLabel);
+                        setTaxRateInput(((c.taxRate ?? 0.1) * 100).toFixed(1).replace(/\.0$/, ""));
+                      }
+                    }}
                     className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-teal-600"
                   >
                     {Object.values(COUNTRIES).map((c) => (
                       <option key={c.code} value={c.code}>
-                        {c.name} ({c.currency})
+                        {c.name} ({c.currency} - {c.currencySymbol})
                       </option>
                     ))}
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">State / Province</label>
+                  {COUNTRIES[countryCode]?.states && COUNTRIES[countryCode].states!.length > 0 ? (
+                    <select
+                      value={stateName}
+                      onChange={(e) => {
+                        const s = e.target.value;
+                        setStateName(s);
+                        const found = COUNTRIES[countryCode]?.states?.find(st => st.name === s);
+                        if (found) {
+                          if (found.taxLabel) setTaxSystem(found.taxLabel);
+                          if (typeof found.taxRate === "number") {
+                            setTaxRateInput((found.taxRate * 100).toFixed(1).replace(/\.0$/, ""));
+                          }
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-teal-600"
+                    >
+                      <option value="">-- Select State --</option>
+                      {COUNTRIES[countryCode].states!.map(st => (
+                        <option key={st.name} value={st.name}>
+                          {st.name} {st.taxRate !== undefined ? `(${(st.taxRate * 100).toFixed(1)}%)` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={stateName}
+                      onChange={(e) => setStateName(e.target.value)}
+                      placeholder="e.g. Region or Province"
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-teal-600"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Currency</label>
+                  <div className="px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-teal-700 dark:text-teal-400">
+                    {COUNTRIES[countryCode]?.currency || "USD"} ({COUNTRIES[countryCode]?.currencySymbol || "$"})
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tax Label</label>
+                  <input
+                    type="text"
+                    value={taxSystem}
+                    onChange={(e) => setTaxSystem(e.target.value)}
+                    placeholder="GST/VAT"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tax Rate (%)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={taxRateInput}
+                      onChange={(e) => setTaxRateInput(e.target.value)}
+                      placeholder="18"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-900 dark:text-white pr-7"
+                    />
+                    <span className="absolute right-2.5 top-2 text-xs font-bold text-slate-400">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Subscription Tier *</label>
                   <select
@@ -485,6 +580,17 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
                     <option value="Standard">Standard Tier</option>
                     <option value="Premium">Premium Tier</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Phone Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-teal-600"
+                    placeholder={COUNTRIES[countryCode]?.phoneFormat || "+1 (555) 000-0000"}
+                  />
                 </div>
               </div>
 
@@ -512,18 +618,6 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
                     placeholder="1234 or custom"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Phone Number *</label>
-                <input
-                  type="text"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-teal-600"
-                  placeholder="+91 99880-12345"
-                />
               </div>
 
               <div>

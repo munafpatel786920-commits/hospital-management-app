@@ -1614,8 +1614,65 @@ export default function SupportModules({
   const [setHospEmail, setSetHospEmail] = useState(hospitalDetails.email);
   const [setHospPhone, setSetHospPhone] = useState(hospitalDetails.phone);
   const [setHospAddress, setSetHospAddress] = useState(hospitalDetails.address);
-  const [setHospTaxRate, setSetHospTaxRate] = useState((hospitalDetails.taxRate * 100).toString());
+  const [setHospCountryCode, setSetHospCountryCode] = useState(hospitalDetails.countryCode || "IN");
+  const [setHospState, setSetHospState] = useState(hospitalDetails.state || "");
+  const [setHospTaxSystem, setSetHospTaxSystem] = useState(hospitalDetails.taxSystem || "GST");
+  const [setHospTaxRate, setSetHospTaxRate] = useState(((hospitalDetails.taxRate ?? 0.18) * 100).toString());
+  const [setHospCurrency, setSetHospCurrency] = useState(hospitalDetails.currency || "INR");
+  const [setHospCurrencySymbol, setSetHospCurrencySymbol] = useState(hospitalDetails.currencySymbol || COUNTRIES[hospitalDetails.countryCode]?.currencySymbol || "₹");
   const [setHospLogo, setSetHospLogo] = useState(hospitalDetails.logoUrl || "");
+
+  // Keep settings states in sync if hospitalDetails changes externally
+  React.useEffect(() => {
+    setSetHospName(hospitalDetails.name);
+    setSetHospEmail(hospitalDetails.email);
+    setSetHospPhone(hospitalDetails.phone);
+    setSetHospAddress(hospitalDetails.address);
+    setSetHospCountryCode(hospitalDetails.countryCode || "IN");
+    setSetHospState(hospitalDetails.state || "");
+    setSetHospTaxSystem(hospitalDetails.taxSystem || "GST");
+    setSetHospTaxRate(((hospitalDetails.taxRate ?? 0.18) * 100).toString());
+    setSetHospCurrency(hospitalDetails.currency || "INR");
+    setSetHospCurrencySymbol(hospitalDetails.currencySymbol || COUNTRIES[hospitalDetails.countryCode]?.currencySymbol || "₹");
+    setSetHospLogo(hospitalDetails.logoUrl || "");
+  }, [hospitalDetails]);
+
+  // When user selects a new country, automatically propose currency, tax system, tax rate, and states
+  const handleCountryChange = (newCode: string) => {
+    setSetHospCountryCode(newCode);
+    const countryCfg = COUNTRIES[newCode] || COUNTRIES.US;
+    setSetHospCurrency(countryCfg.currency);
+    setSetHospCurrencySymbol(countryCfg.currencySymbol);
+
+    // If country has states, pick the first state and its tax rate if available
+    if (countryCfg.states && countryCfg.states.length > 0) {
+      const firstState = countryCfg.states[0];
+      setSetHospState(firstState.name);
+      setSetHospTaxSystem(firstState.taxLabel || countryCfg.taxLabel);
+      setSetHospTaxRate(((firstState.taxRate ?? countryCfg.taxRate) * 100).toFixed(1).replace(/\.0$/, ""));
+    } else {
+      setSetHospState("");
+      setSetHospTaxSystem(countryCfg.taxLabel);
+      setSetHospTaxRate(((countryCfg.taxRate ?? 0.1) * 100).toFixed(1).replace(/\.0$/, ""));
+    }
+  };
+
+  // When user selects a state/province
+  const handleStateChange = (newState: string) => {
+    setSetHospState(newState);
+    const countryCfg = COUNTRIES[setHospCountryCode];
+    if (countryCfg && countryCfg.states) {
+      const foundState = countryCfg.states.find(s => s.name === newState);
+      if (foundState) {
+        if (foundState.taxLabel) {
+          setSetHospTaxSystem(foundState.taxLabel);
+        }
+        if (typeof foundState.taxRate === "number") {
+          setSetHospTaxRate((foundState.taxRate * 100).toFixed(1).replace(/\.0$/, ""));
+        }
+      }
+    }
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1630,16 +1687,22 @@ export default function SupportModules({
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedTaxRate = Math.max(0, Number(setHospTaxRate) || 0) / 100;
     DB.updateHospital(hospitalId, {
       name: setHospName,
       email: setHospEmail,
       phone: setHospPhone,
       address: setHospAddress,
-      taxRate: Number(setHospTaxRate) / 100,
+      countryCode: setHospCountryCode,
+      state: setHospState,
+      taxSystem: setHospTaxSystem,
+      taxRate: parsedTaxRate,
+      currency: setHospCurrency,
+      currencySymbol: setHospCurrencySymbol,
       logoUrl: setHospLogo
     });
     onRefreshHospital();
-    onLogAction("Update Clinic Settings", "Modified clinic details, tax setups, or address mappings.");
+    onLogAction("Update Clinic Settings", `Updated ${setHospName} location to ${setHospCountryCode}${setHospState ? ` (${setHospState})` : ""}, Currency: ${setHospCurrency}, Tax: ${setHospTaxSystem} @ ${(parsedTaxRate * 100).toFixed(1)}%`);
   };
 
   const [backupSuccess, setBackupSuccess] = useState(false);
@@ -2731,7 +2794,9 @@ export default function SupportModules({
             {/* Tax Overview */}
             <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 rounded-xl p-5 shadow-sm">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-slate-800 dark:text-white text-xs uppercase tracking-wider text-amber-600">Tax Overview ({config.taxLabel || "Tax"})</h3>
+                <h3 className="font-semibold text-slate-800 dark:text-white text-xs uppercase tracking-wider text-amber-600">
+                  Tax Overview ({hospitalDetails.taxSystem || config.taxLabel || "Tax"})
+                </h3>
                 <button 
                   onClick={handleExportPDF}
                   className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
@@ -2743,29 +2808,29 @@ export default function SupportModules({
               <div className="space-y-4">
                 <div className="flex justify-between items-center text-[11px] border-b border-slate-50 pb-2">
                   <span className="text-slate-500 font-medium">OPD Services Tax</span>
-                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(opdTax, countryCode)}</span>
+                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(opdTax, countryCode, hospitalDetails.currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between items-center text-[11px] border-b border-slate-50 pb-2">
                   <span className="text-slate-500 font-medium">IPD Admissions Tax</span>
-                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(ipdTax, countryCode)}</span>
+                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(ipdTax, countryCode, hospitalDetails.currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between items-center text-[11px] border-b border-slate-50 pb-2">
                   <span className="text-slate-500 font-medium">Pharmacy Sales Tax</span>
-                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(pharmTax, countryCode)}</span>
+                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(pharmTax, countryCode, hospitalDetails.currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between items-center text-[11px] border-b border-slate-50 pb-2">
                   <span className="text-slate-500 font-medium">Laboratory/Tests Tax</span>
-                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(labTax, countryCode)}</span>
+                  <span className="font-bold font-mono text-slate-700 dark:text-slate-300">{formatCurrency(labTax, countryCode, hospitalDetails.currencySymbol)}</span>
                 </div>
                 
                 <div className="pt-2">
                   <div className="flex justify-between items-center text-xs border-b border-slate-100 pb-2 bg-amber-50/30 dark:bg-amber-950/20 -mx-2 px-2 py-1 rounded">
-                    <span className="text-amber-800 dark:text-amber-400 font-bold">Total {config.taxLabel || "Tax"} Collected</span>
-                    <span className="font-bold font-mono text-amber-600 dark:text-amber-400">{formatCurrency(totalTaxCollected, countryCode)}</span>
+                    <span className="text-amber-800 dark:text-amber-400 font-bold">Total {hospitalDetails.taxSystem || config.taxLabel || "Tax"} Collected</span>
+                    <span className="font-bold font-mono text-amber-600 dark:text-amber-400">{formatCurrency(totalTaxCollected, countryCode, hospitalDetails.currencySymbol)}</span>
                   </div>
                   <div className="flex justify-between items-center text-xs border-b border-slate-100 pb-2 mt-2">
                     <span className="text-slate-500 font-medium">Taxable Revenue (Net)</span>
-                    <span className="font-bold font-mono text-slate-800 dark:text-white">{formatCurrency(totalPaid - totalTaxCollected, countryCode)}</span>
+                    <span className="font-bold font-mono text-slate-800 dark:text-white">{formatCurrency(totalPaid - totalTaxCollected, countryCode, hospitalDetails.currencySymbol)}</span>
                   </div>
                 </div>
                 
@@ -2773,7 +2838,7 @@ export default function SupportModules({
                   <div className="flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                     <p className="text-[10px] text-slate-500 leading-relaxed italic">
-                      Tax compliance estimate based on settled transactions. Tax Rate applied: {((hospitalDetails.taxRate || config.taxRate) * 100).toFixed(1)}% {config.taxLabel}.
+                      Tax compliance estimate based on settled transactions. Tax Rate applied: {((hospitalDetails.taxRate ?? config.taxRate) * 100).toFixed(1)}% {hospitalDetails.taxSystem || config.taxLabel}{hospitalDetails.state ? ` (${hospitalDetails.state})` : ""}.
                     </p>
                   </div>
                 </div>
@@ -2827,24 +2892,131 @@ export default function SupportModules({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-500 font-semibold uppercase mb-1">Default Country Presets (Locked)</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={`${hospitalDetails.countryCode} Preset (Tax: ${hospitalDetails.taxSystem})`}
-                    className="w-full px-3.5 py-2 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 cursor-not-allowed"
-                  />
+              {/* Country, State/Province, Currency and Dynamic Tax Configuration */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-700 rounded-xl space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+                    Regional & Multi-Country Tax Localization
+                  </h4>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-300 rounded-full">
+                    Unlocked & Customizable
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-slate-500 font-semibold uppercase mb-1">Local Tax setup (%)</label>
-                  <input
-                    type="number"
-                    value={setHospTaxRate}
-                    onChange={(e) => setSetHospTaxRate(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1">
+                      Operating Country *
+                    </label>
+                    <select
+                      value={setHospCountryCode}
+                      onChange={(e) => handleCountryChange(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-medium focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    >
+                      {Object.values(COUNTRIES).map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name} ({c.currency} - {c.currencySymbol})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1">
+                      State / Province / Region
+                    </label>
+                    {COUNTRIES[setHospCountryCode]?.states && COUNTRIES[setHospCountryCode].states!.length > 0 ? (
+                      <select
+                        value={setHospState}
+                        onChange={(e) => handleStateChange(e.target.value)}
+                        className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-medium focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      >
+                        <option value="">-- Select State / Region --</option>
+                        {COUNTRIES[setHospCountryCode].states!.map((st) => (
+                          <option key={st.name} value={st.name}>
+                            {st.name} {st.taxRate !== undefined ? `(${(st.taxRate * 100).toFixed(1)}% ${st.taxLabel || ""})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={setHospState}
+                        onChange={(e) => setSetHospState(e.target.value)}
+                        placeholder="e.g. Federal / Capital Region"
+                        className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1">
+                      Active Currency & Symbol
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={setHospCurrency}
+                        onChange={(e) => setSetHospCurrency(e.target.value.toUpperCase())}
+                        placeholder="USD"
+                        className="w-2/3 px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-mono font-bold"
+                      />
+                      <input
+                        type="text"
+                        value={setHospCurrencySymbol}
+                        onChange={(e) => setSetHospCurrencySymbol(e.target.value)}
+                        placeholder="$"
+                        title="Currency Symbol"
+                        className="w-1/3 px-2 py-2 text-sm text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1">
+                      Tax System / Classification
+                    </label>
+                    <input
+                      type="text"
+                      value={setHospTaxSystem}
+                      onChange={(e) => setSetHospTaxSystem(e.target.value)}
+                      placeholder="e.g. GST, VAT, Sales Tax"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                      <span>Manual Tax Rate (%) *</span>
+                      <span className="text-[10px] text-teal-600 dark:text-teal-400 font-normal">Editable</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        required
+                        value={setHospTaxRate}
+                        onChange={(e) => setSetHospTaxRate(e.target.value)}
+                        placeholder="e.g. 18"
+                        className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-white font-bold font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 pr-8"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200/60 dark:border-teal-800/60 rounded-lg text-[11px] text-slate-600 dark:text-slate-300 flex items-center justify-between flex-wrap gap-2">
+                  <span>
+                    <strong>Applied Settings Preview:</strong> Invoices & billing will calculate at <strong>{setHospTaxRate || "0"}% {setHospTaxSystem}</strong> using <strong>{setHospCurrencySymbol} ({setHospCurrency})</strong>.
+                  </span>
+                  <span className="font-semibold text-teal-700 dark:text-teal-400">
+                    {COUNTRIES[setHospCountryCode]?.name || setHospCountryCode} {setHospState ? `• ${setHospState}` : ""}
+                  </span>
                 </div>
               </div>
 

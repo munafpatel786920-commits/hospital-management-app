@@ -610,6 +610,7 @@ export default function App() {
                     userId={currentUser.id}
                     userName={currentUser.name}
                     userRole={currentUser.role}
+                    hospitalDetails={hospitalDetails}
                     onNavigate={(tab) => setActiveTab(tab)}
                   />
                 )}
