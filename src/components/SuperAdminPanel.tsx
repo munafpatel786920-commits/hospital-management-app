@@ -6,11 +6,13 @@
 import React, { useState, useEffect } from "react";
 import { DB } from "../lib/db";
 import { COUNTRIES, translate } from "../lib/i18n";
-import { Hospital, UserRole, UserProfile } from "../types";
+import { Hospital, UserRole, UserProfile, LicenseDuration, ActivationKey } from "../types";
+import { formatDurationLabel } from "../lib/crypto";
 import { 
   Plus, ToggleLeft, ToggleRight, Shield, Globe, Award, 
   Building2, Activity, Trash2, AlertTriangle, CheckCircle2,
-  Search, X, Check, Mail, Phone, MapPin, Sparkles
+  Search, X, Check, Mail, Phone, MapPin, Sparkles,
+  KeyRound, Copy, Ban, ShieldCheck, Clock, UserCheck, RefreshCw, Layers
 } from "lucide-react";
 
 interface SuperAdminPanelProps {
@@ -19,11 +21,19 @@ interface SuperAdminPanelProps {
 }
 
 export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperAdminPanelProps) {
+  const [activeAdminTab, setActiveAdminTab] = useState<"hospitals" | "keys">("hospitals");
   const [hospitals, setHospitals] = useState<Hospital[]>(DB.getHospitals());
+  const [activationKeys, setActivationKeys] = useState<ActivationKey[]>(DB.getActivationKeys());
   const [showAddModal, setShowAddModal] = useState(false);
   const [hospitalToDelete, setHospitalToDelete] = useState<Hospital | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Key Generation State
+  const [selectedDuration, setSelectedDuration] = useState<LicenseDuration>("1_year");
+  const [keyNotes, setKeyNotes] = useState("");
+  const [justGeneratedKey, setJustGeneratedKey] = useState<{ key: ActivationKey; rawKey: string } | null>(null);
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   
   // Form State
   const [name, setName] = useState("");
@@ -37,10 +47,12 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Keep hospital list in real-time sync with DB and cloud changes
+  // Keep hospital and activation keys list in real-time sync with DB and cloud changes
   useEffect(() => {
+    setActivationKeys(DB.getActivationKeys());
     const unsub = DB.subscribe((data) => {
       setHospitals(data.hospitals);
+      setActivationKeys(data.activationKeys || []);
     });
     return () => unsub();
   }, []);
@@ -48,6 +60,38 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
   const showToast = (text: string, type: "success" | "error" = "success") => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleGenerateKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    const result = DB.generateActivationKey(selectedDuration, keyNotes);
+    setJustGeneratedKey(result);
+    setActivationKeys(DB.getActivationKeys());
+    setKeyNotes("");
+    showToast(`Generated ${formatDurationLabel(selectedDuration)} activation key!`, "success");
+    onLogAction("Generate Activation Key", `Created key for duration ${selectedDuration}`);
+  };
+
+  const handleCopyKey = (rawKey: string, keyId: string) => {
+    navigator.clipboard.writeText(rawKey);
+    setCopiedKeyId(keyId);
+    showToast("Activation key copied to clipboard!", "success");
+    setTimeout(() => setCopiedKeyId(null), 3000);
+  };
+
+  const handleRevokeKey = (keyId: string) => {
+    const success = DB.revokeActivationKey(keyId);
+    if (success) {
+      setActivationKeys(DB.getActivationKeys());
+      showToast("Activation key revoked.", "success");
+    }
+  };
+
+  const handleToggleCustomerBlock = (hospitalId: string, currentStatus: "Active" | "Inactive") => {
+    const nextBlocked = currentStatus === "Active";
+    DB.toggleHospitalBlock(hospitalId, nextBlocked);
+    setHospitals(DB.getHospitals());
+    showToast(`Hospital account ${nextBlocked ? "Blocked" : "Unblocked"}.`, "success");
   };
 
   const handleToggleStatus = (id: string, currentStatus: "Active" | "Inactive") => {
@@ -182,22 +226,245 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
             {translate("super_admin", currentLanguage)}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
-            Global multi-tenant hospital network cockpit. Onboard, configure, manage, and delete hospital instances.
+            Global multi-tenant hospital network cockpit. Generate activation keys, manage customer licenses & tenant isolation.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-xl transition shadow-md shadow-teal-600/20 active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4" />
-            Onboard Hospital
-          </button>
+          {/* Tab Switcher */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("hospitals")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeAdminTab === "hospitals"
+                  ? "bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400"
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Hospitals ({hospitals.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("keys")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeAdminTab === "keys"
+                  ? "bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400"
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Activation Keys ({activationKeys.length})</span>
+            </button>
+          </div>
+
+          {activeAdminTab === "hospitals" && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-xl transition shadow-md shadow-teal-600/20 active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4" />
+              Onboard Hospital
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Tab 2: Activation Keys Generator & License Management */}
+      {activeAdminTab === "keys" && (
+        <div className="space-y-6">
+          {/* Key Generator Card */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-teal-50 dark:bg-teal-950/60 rounded-xl text-teal-600 dark:text-teal-400">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Generate Customer Activation Key</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Create single-use cryptographic keys with configurable duration.</p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleGenerateKey} className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-end">
+              <div className="sm:col-span-4">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                  License Duration *
+                </label>
+                <select
+                  value={selectedDuration}
+                  onChange={(e) => setSelectedDuration(e.target.value as LicenseDuration)}
+                  className="w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-teal-600"
+                >
+                  <option value="1_month">1 Month (30 Days)</option>
+                  <option value="3_months">3 Months (90 Days)</option>
+                  <option value="6_months">6 Months (Half Year)</option>
+                  <option value="1_year">1 Year (Annual)</option>
+                  <option value="lifetime">Lifetime License (Permanent)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-5">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                  Customer / Hospital Note (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={keyNotes}
+                  onChange={(e) => setKeyNotes(e.target.value)}
+                  placeholder="e.g. Dr. Verma Clinic - Mumbai branch"
+                  className="w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-600"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <button
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-teal-600/20 active:scale-95 cursor-pointer"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  Generate Key
+                </button>
+              </div>
+            </form>
+
+            {/* Just Generated Key Banner (One-time Display) */}
+            {justGeneratedKey && (
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>New Key Created Successfully ({formatDurationLabel(justGeneratedKey.key.duration)})</span>
+                  </div>
+                  <div className="text-lg font-mono font-black text-slate-900 dark:text-white mt-1 tracking-wider selection:bg-teal-200">
+                    {justGeneratedKey.rawKey}
+                  </div>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    Provide this key to the customer. For security, only the hash is retained in the database.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyKey(justGeneratedKey.rawKey, justGeneratedKey.key.id)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition shrink-0 active:scale-95"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copiedKeyId === justGeneratedKey.key.id ? "Copied!" : "Copy Key Code"}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Activation Keys Ledger Table */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">All Generated Activation Keys</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Total keys: {activationKeys.length} • Track activation date, expiry date and customer accounts</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
+                    <th className="px-5 py-3">Key ID & Hash</th>
+                    <th className="px-5 py-3">Duration</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Activated Hospital</th>
+                    <th className="px-5 py-3">Activated User ID</th>
+                    <th className="px-5 py-3">Expiry Date</th>
+                    <th className="px-5 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {activationKeys.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
+                        No activation keys generated yet. Use the form above to generate your first license key.
+                      </td>
+                    </tr>
+                  ) : (
+                    activationKeys.map((k) => (
+                      <tr key={k.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                        <td className="px-5 py-3.5">
+                          <div className="font-mono font-bold text-slate-900 dark:text-white">{k.keyMasked}</div>
+                          <div className="font-mono text-[10px] text-slate-400 truncate max-w-[140px]" title={k.keyHash}>
+                            ID: {k.id}
+                          </div>
+                          {k.notes && <div className="text-[10px] text-teal-600 dark:text-teal-400 font-medium mt-0.5">{k.notes}</div>}
+                        </td>
+                        <td className="px-5 py-3.5 font-semibold text-slate-700 dark:text-slate-300">
+                          {formatDurationLabel(k.duration)}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            k.status === "active"
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                              : k.status === "unused"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                              : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                          }`}>
+                            {k.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {k.activatedHospitalName ? (
+                            <div>
+                              <div className="font-bold text-slate-900 dark:text-white">{k.activatedHospitalName}</div>
+                              <div className="font-mono text-[10px] text-slate-400">{k.activatedHospitalId}</div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Not yet activated</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 font-mono text-slate-700 dark:text-slate-300">
+                          {k.activatedUserId || <span className="text-slate-400 italic">-</span>}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {k.duration === "lifetime" ? (
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">Never (Lifetime)</span>
+                          ) : k.expiresAtCalculated ? (
+                            <div>
+                              <div className="font-semibold text-slate-800 dark:text-slate-200">
+                                {new Date(k.expiresAtCalculated).toLocaleDateString()}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {Date.now() > new Date(k.expiresAtCalculated).getTime() ? "Expired" : "Active"}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Calculated on activation</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          {k.status === "unused" && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeKey(k.id)}
+                              className="px-2.5 py-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+                            >
+                              Revoke Key
+                            </button>
+                          )}
+                          {k.status === "active" && k.activatedHospitalId && (
+                            <div className="text-[11px] text-emerald-600 font-medium">Activated</div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards (Shown when Hospitals Tab is active) */}
+      {activeAdminTab === "hospitals" && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-4 shadow-xs">
           <div className="p-3 bg-teal-50 dark:bg-teal-950/60 rounded-xl text-teal-600 dark:text-teal-400">
@@ -241,8 +508,10 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
           </div>
         </div>
       </div>
+      )}
 
-      {/* Hospital Listing Table & Controls */}
+      {/* Hospital Listing Table & Controls (Shown when Hospitals Tab is active) */}
+      {activeAdminTab === "hospitals" && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
         <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
@@ -353,6 +622,21 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
                             )}
                           </button>
 
+                          {/* Block/Unblock Customer Account Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCustomerBlock(hospital.id, hospital.status)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer ${
+                              hospital.status === "Active"
+                                ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                            }`}
+                            title={hospital.status === "Active" ? "Block Customer Access" : "Unblock Customer Access"}
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                            <span>{hospital.status === "Active" ? "Block" : "Unblock"}</span>
+                          </button>
+
                           {/* Delete Hospital Button */}
                           <button
                             type="button"
@@ -373,6 +657,7 @@ export default function SuperAdminPanel({ currentLanguage, onLogAction }: SuperA
           </table>
         </div>
       </div>
+      )}
 
       {/* IN-APP CONFIRMATION MODAL FOR DELETING HOSPITAL (Works 100% reliably in iFrames, Mobile & Desktop) */}
       {hospitalToDelete && (

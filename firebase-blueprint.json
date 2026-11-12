@@ -73,6 +73,24 @@
         "updatedAt": { "type": "string" },
         "data": { "type": "string" }
       }
+    },
+    "ActivationKey": {
+      "collection": "activation_keys",
+      "fields": {
+        "id": { "type": "string" },
+        "keyHash": { "type": "string" },
+        "maskedKey": { "type": "string" },
+        "duration": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "activatedAt": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "usedByHospitalId": { "type": "string" },
+        "usedByUserId": { "type": "string" },
+        "hospitalName": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdBySuperAdminId": { "type": "string" }
+      }
     }
   }
 }

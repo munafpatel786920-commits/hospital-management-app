@@ -13,6 +13,7 @@ import ClinicalModules from "./components/ClinicalModules";
 import SupportModules from "./components/SupportModules";
 import DashboardHome from "./components/DashboardHome";
 import LoginPage from "./components/LoginPage";
+import CustomerActivation from "./components/CustomerActivation";
 import { RoleManagement } from "./components/RoleManagement";
 import { 
   Building2, Users, ShieldAlert, Heart, Sun, Moon, 
@@ -80,7 +81,19 @@ export default function App() {
   const [users, setUsers] = useState<UserProfile[]>(DB.getUsers());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [showActivationPage, setShowActivationPage] = useState<boolean>(false);
   const [cloudStatus, setCloudStatus] = useState(DB.getCloudStatus());
+
+  // Real-time license status enforcement
+  useEffect(() => {
+    if (currentUser && currentUser.role !== UserRole.SUPER_ADMIN && currentUser.hospitalId) {
+      const licenseStatus = DB.isHospitalLicenseActive(currentUser.hospitalId);
+      if (!licenseStatus.active) {
+        handleLogout();
+        showToast(`Account Access Suspended: ${licenseStatus.reason}`);
+      }
+    }
+  }, [currentUser, hospitals]);
 
   // Subscribe to real-time database updates (including Firebase Firestore sync)
   useEffect(() => {
@@ -216,7 +229,21 @@ export default function App() {
     <div className={`${darkMode ? "dark" : ""} min-h-screen font-sans antialiased bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors duration-200`} dir={isRtl ? "rtl" : "ltr"}>
       
       {!isAuthenticated ? (
-        <LoginPage onLogin={handleLogin} />
+        showActivationPage ? (
+          <CustomerActivation
+            onBackToLogin={() => setShowActivationPage(false)}
+            onSuccess={(newUser) => {
+              setShowActivationPage(false);
+              handleLogin(newUser);
+              showToast(`Hospital account activated successfully! Logged in as ${newUser.name}`);
+            }}
+          />
+        ) : (
+          <LoginPage
+            onLogin={handleLogin}
+            onOpenActivation={() => setShowActivationPage(true)}
+          />
+        )
       ) : (
         <>
           {/* Toast alert box */}

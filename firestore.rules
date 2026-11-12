@@ -1,7 +1,31 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Hospital Management System collections
+    // CareMatrix Global State & Multi-tenant ERP Store
+    match /app_state/{document} {
+      allow read, write: if true;
+    }
+
+    // Activation Keys collection
+    match /activation_keys/{keyId} {
+      allow read, write: if true;
+    }
+
+    // Hospital tenant collections
+    match /hospitals/{hospitalId} {
+      allow read, write: if true;
+    }
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    match /patients/{patientId} {
+      allow read, write: if true;
+    }
+    match /appointments/{appointmentId} {
+      allow read, write: if true;
+    }
+
+    // Fallback for subcollections and remaining hospital data
     match /{document=**} {
       allow read, write: if true;
     }

@@ -59,10 +59,37 @@ export interface Hospital {
   taxRate: number;
   state?: string;
   currencySymbol?: string;
+  licenseId?: string;
+  licenseKeyHash?: string;
+  licenseDuration?: LicenseDuration;
+  licenseActivatedAt?: string;
+  licenseExpiresAt?: string; // ISO String or "lifetime"
+  isLifetimeLicense?: boolean;
   departments: string[];
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+}
+
+export type LicenseDuration = "1_month" | "3_months" | "6_months" | "1_year" | "lifetime";
+
+export type ActivationKeyStatus = "unused" | "active" | "revoked";
+
+export interface ActivationKey {
+  id: string; // Internal ID (e.g. KEY-XXX)
+  keyHash: string; // SHA-256 hash of the activation key
+  keyMasked: string; // e.g. "CMX-••••-••••-9F2A" for display
+  rawKey?: string; // Only temporarily displayed upon generation, never stored permanently in cloud
+  duration: LicenseDuration;
+  status: ActivationKeyStatus;
+  createdAt: string;
+  expiresAtCalculated?: string; // Projected expiration once activated
+  activatedAt?: string;
+  activatedHospitalId?: string;
+  activatedHospitalName?: string;
+  activatedUserId?: string;
+  revokedAt?: string;
+  notes?: string;
 }
 
 export interface UserProfile {

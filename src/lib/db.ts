@@ -8,8 +8,10 @@ import {
   Hospital, UserProfile, UserRole, Patient, Doctor, Staff, 
   Appointment, OPDRecord, IPDRecord, Bed, Medicine, LabTest, 
   BillingInvoice, Ambulance, BloodDonor, BloodStock, InventoryItem, 
-  EmployeeHR, AuditLog, BloodTransaction, MedicinePurchase, Expense
+  EmployeeHR, AuditLog, BloodTransaction, MedicinePurchase, Expense,
+  ActivationKey, LicenseDuration
 } from "../types";
+import { fastHash, generateActivationKeyCode, maskActivationKey, calculateExpiryDate } from "./crypto";
 
 // LOCAL-FIRST PERSISTENT MULTI-TENANT ENGINE WITH GOOGLE FIREBASE CLOUD SYNC
 const LOCAL_STORAGE_KEY = "CAREMATRIX_DB";
@@ -37,6 +39,7 @@ interface SystemDB {
   medicinePurchases?: MedicinePurchase[];
   expenses?: Expense[];
   rolePermissions?: { [role: string]: string[] };
+  activationKeys?: ActivationKey[];
 }
 
 const DEFAULT_DEPARTMENTS = [
@@ -798,14 +801,34 @@ class CareMatrixDatabase {
           this.data.rolePermissions = this.getDefaultRolePermissions();
           this.save(true);
         }
+
+        // Initialize activationKeys collection
+        if (!this.data.activationKeys) {
+          this.data.activationKeys = [];
+        }
+
+        // Grandfather existing seed hospitals with lifetime licenses so they are never locked out
+        this.data.hospitals = this.data.hospitals.map(h => {
+          if (!h.licenseExpiresAt && !h.isLifetimeLicense) {
+            return {
+              ...h,
+              isLifetimeLicense: true,
+              licenseExpiresAt: "lifetime",
+              licenseDuration: "lifetime"
+            };
+          }
+          return h;
+        });
       } catch (e) {
         this.data = JSON.parse(JSON.stringify(SEED_DATA));
         this.data.rolePermissions = this.getDefaultRolePermissions();
+        this.data.activationKeys = [];
         this.save(true);
       }
     } else {
       this.data = JSON.parse(JSON.stringify(SEED_DATA));
       this.data.rolePermissions = this.getDefaultRolePermissions();
+      this.data.activationKeys = [];
       this.save(true);
     }
 
@@ -928,6 +951,25 @@ class CareMatrixDatabase {
       this.syncTimeout = setTimeout(() => {
         this.pushToFirestore();
       }, 250);
+    }
+  }
+
+  public getBackupJSON(): string {
+    return JSON.stringify(this.data, null, 2);
+  }
+
+  public restoreBackup(jsonString: string): boolean {
+    try {
+      const parsed = JSON.parse(jsonString) as SystemDB;
+      if (!parsed || !Array.isArray(parsed.hospitals) || !Array.isArray(parsed.users)) {
+        return false;
+      }
+      this.data = parsed;
+      this.save();
+      return true;
+    } catch (e) {
+      console.error("Failed to restore backup:", e);
+      return false;
     }
   }
 
@@ -1682,23 +1724,246 @@ class CareMatrixDatabase {
     this.save();
   }
 
-  // Backup and Restore helper
-  getBackupJSON(): string {
-    return JSON.stringify(this.data, null, 2);
+  // ==========================================
+  // ACTIVATION KEYS & CUSTOMER LICENSE ENGINE
+  // ==========================================
+  getActivationKeys(): ActivationKey[] {
+    if (!this.data.activationKeys) {
+      this.data.activationKeys = [];
+    }
+    return this.data.activationKeys;
   }
 
-  restoreBackup(jsonString: string): boolean {
-    try {
-      const parsed = JSON.parse(jsonString);
-      if (parsed.hospitals && parsed.users && parsed.patients) {
-        this.data = parsed;
-        this.save();
-        return true;
-      }
-    } catch (e) {
-      console.error("Failed to restore backup", e);
+  generateActivationKey(duration: LicenseDuration, notes?: string): { key: ActivationKey; rawKey: string } {
+    if (!this.data.activationKeys) {
+      this.data.activationKeys = [];
     }
-    return false;
+
+    const rawKey = generateActivationKeyCode();
+    const keyHash = fastHash(rawKey);
+    const keyMasked = maskActivationKey(rawKey);
+    const id = `KEY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    const newKey: ActivationKey = {
+      id,
+      keyHash,
+      keyMasked,
+      duration,
+      status: "unused",
+      createdAt: new Date().toISOString(),
+      notes: notes?.trim()
+    };
+
+    this.data.activationKeys.unshift(newKey);
+    this.save();
+    this.logAction(null, "system", "Super Admin", UserRole.SUPER_ADMIN, "Generate Key", `Generated ${duration} activation key ${keyMasked}`);
+
+    return { key: newKey, rawKey };
+  }
+
+  revokeActivationKey(keyId: string): boolean {
+    if (!this.data.activationKeys) return false;
+    const key = this.data.activationKeys.find(k => k.id === keyId);
+    if (!key) return false;
+
+    key.status = "revoked";
+    key.revokedAt = new Date().toISOString();
+    this.save();
+    this.logAction(null, "system", "Super Admin", UserRole.SUPER_ADMIN, "Revoke Key", `Revoked activation key ${key.keyMasked}`);
+    return true;
+  }
+
+  verifyActivationKey(rawKey: string): { valid: boolean; key?: ActivationKey; error?: string } {
+    if (!this.data.activationKeys) {
+      this.data.activationKeys = [];
+    }
+    const clean = rawKey.trim().toUpperCase();
+    if (!clean) {
+      return { valid: false, error: "Please enter an activation key." };
+    }
+
+    const inputHash = fastHash(clean);
+    const key = this.data.activationKeys.find(k => k.keyHash === inputHash);
+
+    if (!key) {
+      return { valid: false, error: "Invalid activation key. Please verify with your system administrator." };
+    }
+
+    if (key.status === "active") {
+      return { valid: false, error: `This activation key has already been used for ${key.activatedHospitalName || "another hospital"}. Each key is valid for single use only.` };
+    }
+
+    if (key.status === "revoked") {
+      return { valid: false, error: "This activation key has been revoked by the system administrator." };
+    }
+
+    return { valid: true, key };
+  }
+
+  activateCustomerHospital(params: {
+    rawKey: string;
+    hospitalName: string;
+    desiredUserId: string;
+    password: string;
+    countryCode?: string;
+    phone?: string;
+    email?: string;
+  }): { success: boolean; hospital?: Hospital; user?: UserProfile; error?: string } {
+    const verification = this.verifyActivationKey(params.rawKey);
+    if (!verification.valid || !verification.key) {
+      return { success: false, error: verification.error || "Invalid key" };
+    }
+
+    const key = verification.key;
+    const cleanUserId = params.desiredUserId.trim().toLowerCase();
+    const cleanName = params.hospitalName.trim();
+
+    if (!cleanName) {
+      return { success: false, error: "Hospital name cannot be empty." };
+    }
+
+    if (!cleanUserId || cleanUserId.length < 3) {
+      return { success: false, error: "User ID must be at least 3 characters." };
+    }
+
+    // Check if user ID or hospital name already exists
+    const existingUser = this.data.users.find(u => u.id.toLowerCase() === cleanUserId || u.email.toLowerCase() === cleanUserId);
+    if (existingUser) {
+      return { success: false, error: `User ID "${params.desiredUserId}" is already taken. Please choose another User ID.` };
+    }
+
+    // Generate unique Tenant ID: HOSP-XXXX
+    let tenantId = `HOSP-${Math.floor(1000 + Math.random() * 9000)}`;
+    while (this.data.hospitals.some(h => h.id === tenantId)) {
+      tenantId = `HOSP-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    const activatedAt = new Date().toISOString();
+    const expiresAt = calculateExpiryDate(key.duration, new Date());
+    const isLifetime = key.duration === "lifetime";
+
+    const newHospital: Hospital = {
+      id: tenantId,
+      name: cleanName,
+      countryCode: params.countryCode || "IN",
+      currency: "INR",
+      language: "en",
+      status: "Active",
+      plan: key.duration === "lifetime" ? "Premium" : "Standard",
+      address: "Primary Facility",
+      phone: params.phone?.trim() || "+91 99999-00000",
+      email: params.email?.trim() || `${cleanUserId}@carematrix.local`,
+      taxSystem: "GST",
+      taxRate: 0.18,
+      licenseId: key.id,
+      licenseKeyHash: key.keyHash,
+      licenseDuration: key.duration,
+      licenseActivatedAt: activatedAt,
+      licenseExpiresAt: expiresAt || "lifetime",
+      isLifetimeLicense: isLifetime,
+      departments: DEFAULT_DEPARTMENTS,
+      createdAt: activatedAt,
+      updatedAt: activatedAt,
+      createdBy: "Customer Self-Activation"
+    };
+
+    const newAdminUser: UserProfile = {
+      id: cleanUserId,
+      hospitalId: tenantId,
+      name: `${cleanName} Admin`,
+      email: params.email?.trim() || `${cleanUserId}@carematrix.local`,
+      password: params.password.trim(),
+      role: UserRole.HOSPITAL_ADMIN,
+      phone: params.phone?.trim() || "+91 99999-00000",
+      status: "Active",
+      createdAt: activatedAt,
+      updatedAt: activatedAt
+    };
+
+    // Mark key as consumed (Atomic single-use guarantee)
+    key.status = "active";
+    key.activatedAt = activatedAt;
+    key.activatedHospitalId = tenantId;
+    key.activatedHospitalName = cleanName;
+    key.activatedUserId = cleanUserId;
+    key.expiresAtCalculated = expiresAt || "lifetime";
+
+    this.addHospital(newHospital);
+    this.addUser(newAdminUser);
+
+    this.logAction(
+      tenantId,
+      cleanUserId,
+      newAdminUser.name,
+      UserRole.HOSPITAL_ADMIN,
+      "Customer Activation",
+      `Activated new tenant ${cleanName} (${tenantId}) with ${key.duration} license using key ${key.keyMasked}`
+    );
+
+    return {
+      success: true,
+      hospital: newHospital,
+      user: newAdminUser
+    };
+  }
+
+  isHospitalLicenseActive(hospitalId: string | null): { active: boolean; reason?: string; hospital?: Hospital } {
+    if (!hospitalId) {
+      // Super Admin has no hospital restriction
+      return { active: true };
+    }
+
+    const hospital = this.data.hospitals.find(h => h.id === hospitalId);
+    if (!hospital) {
+      return { active: false, reason: "Hospital not found." };
+    }
+
+    if (hospital.status === "Inactive") {
+      return { active: false, reason: `Account for ${hospital.name} is currently suspended/blocked by the Super Administrator.`, hospital };
+    }
+
+    // Check lifetime license
+    if (hospital.isLifetimeLicense || hospital.licenseExpiresAt === "lifetime") {
+      return { active: true, hospital };
+    }
+
+    // Check expiration date
+    if (hospital.licenseExpiresAt) {
+      const expTime = new Date(hospital.licenseExpiresAt).getTime();
+      if (!isNaN(expTime) && Date.now() > expTime) {
+        return {
+          active: false,
+          reason: `License for ${hospital.name} expired on ${new Date(hospital.licenseExpiresAt).toLocaleDateString()}. Please contact administration to renew your key.`,
+          hospital
+        };
+      }
+    }
+
+    return { active: true, hospital };
+  }
+
+  toggleHospitalBlock(hospitalId: string, blocked: boolean): boolean {
+    const hospital = this.data.hospitals.find(h => h.id === hospitalId);
+    if (!hospital) return false;
+
+    hospital.status = blocked ? "Inactive" : "Active";
+    hospital.updatedAt = new Date().toISOString();
+
+    // Also update all user profiles for this hospital
+    this.data.users = this.data.users.map(u => 
+      u.hospitalId === hospitalId ? { ...u, status: blocked ? "Inactive" : "Active" } : u
+    );
+
+    this.save();
+    this.logAction(
+      hospitalId,
+      "system",
+      "Super Admin",
+      UserRole.SUPER_ADMIN,
+      blocked ? "Block Customer" : "Unblock Customer",
+      `${blocked ? "Blocked" : "Unblocked"} hospital ${hospital.name} (${hospitalId}) and suspended staff access`
+    );
+    return true;
   }
 }
 

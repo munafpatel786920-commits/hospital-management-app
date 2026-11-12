@@ -4,14 +4,15 @@ import { UserRole, UserProfile } from "../types";
 import { 
   Lock, User, Building2, ShieldCheck, Activity, Stethoscope, 
   Pill, FileText, Sparkles, CheckCircle2, Mail, HeartPulse, ArrowRight,
-  Eye, EyeOff, Cloud, BedDouble, ReceiptText
+  Eye, EyeOff, Cloud, BedDouble, ReceiptText, KeyRound
 } from "lucide-react";
 
 interface Props {
   onLogin: (user: UserProfile) => void;
+  onOpenActivation?: () => void;
 }
 
-export default function LoginPage({ onLogin }: Props) {
+export default function LoginPage({ onLogin, onOpenActivation }: Props) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -102,6 +103,20 @@ export default function LoginPage({ onLogin }: Props) {
       (user.id === "usr-super" && (cleanPassLower === "munaf" || cleanPassLower === "patel" || cleanPassLower === "superadmin"));
 
     if (isPassValid) {
+      // 3. Security & License Verification: Prevent blocked or expired accounts
+      if (user.status === "Inactive") {
+        setError(`Account for ${user.name} is currently suspended/inactive. Please contact your system administrator.`);
+        return;
+      }
+
+      if (user.hospitalId) {
+        const licenseCheck = DB.isHospitalLicenseActive(user.hospitalId);
+        if (!licenseCheck.active) {
+          setError(licenseCheck.reason || "Your hospital license is expired or suspended. Please contact administrator.");
+          return;
+        }
+      }
+
       onLogin(user);
     } else {
       setError(`Incorrect password for ${user.name}. Please enter your valid password.`);
@@ -283,6 +298,19 @@ export default function LoginPage({ onLogin }: Props) {
                 Sign In to System
                 <ArrowRight className="w-4 h-4" />
               </button>
+
+              {onOpenActivation && (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={onOpenActivation}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 transition py-1 cursor-pointer"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Have an Activation Key? Register Hospital</span>
+                  </button>
+                </div>
+              )}
             </form>
           </div>
 
